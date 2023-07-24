@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::hostcalls::{serial_utils::serialize_map, set_status};
+use crate::hostcalls::{
+    serial_utils::serialize_map, serial_utils::serialize_property_path, set_status,
+};
 use crate::types::*;
 
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -96,6 +98,7 @@ pub struct Expect {
         Option<Duration>,
         Option<u32>,
     )>,
+    get_property_value: Vec<(Option<Bytes>, Option<Bytes>)>,
 }
 
 impl Expect {
@@ -117,6 +120,7 @@ impl Expect {
             send_local_response: vec![],
             http_call: vec![],
             grpc_call: vec![],
+            get_property_value: vec![],
         }
     }
 
@@ -646,6 +650,38 @@ impl Expect {
                         .unwrap_or(true);
                 set_expect_status(expected);
                 return result;
+            }
+        }
+    }
+
+    pub fn set_expect_get_property(
+        &mut self,
+        path: Option<Vec<&str>>,
+        property_data: Option<&[u8]>,
+    ) {
+        self.expect_count += 1;
+        self.get_property_value.push((
+            path.map(|segments: Vec<&str>| serialize_property_path(segments)),
+            property_data.map(|data| data.to_vec()),
+        ));
+    }
+
+    pub fn get_expect_get_property(&mut self, path: &[u8]) -> Option<Bytes> {
+        match self.get_property_value.len() {
+            0 => {
+                if !self.allow_unexpected {
+                    self.expect_count -= 1;
+                }
+                set_status(ExpectStatus::Unexpected);
+                None
+            }
+            _ => {
+                self.expect_count -= 1;
+                let (expected_path, result) = self.get_property_value.remove(0);
+                // when expected anything is None, behave as catch all
+                let expected = expected_path.map(|p| p == path).unwrap_or(true);
+                set_expect_status(expected);
+                result
             }
         }
     }
