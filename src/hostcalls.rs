@@ -281,20 +281,85 @@ fn get_hostfunc(
         "proxy_get_property" => {
             Some(Func::wrap(
                 store,
-                |_caller: Caller<'_, ()>,
-                 _path_data: i32,
-                 _path_size: i32,
-                 _return_value_data: i32,
-                 _return_value_size: i32|
+                |mut caller: Caller<'_, ()>,
+                 path_data: i32,
+                 path_size: i32,
+                 return_value_data: i32,
+                 return_value_size: i32|
                  -> i32 {
-                    // Default Function:
-                    // Expectation:
+                    println!("[vm->host] proxy_get_property({path_data}, {path_size})");
+
+                    let mem = match caller.get_export("memory") {
+                        Some(Extern::Memory(mem)) => mem,
+                        _ => {
+                            println!("Error: proxy_get_property cannot get export \"memory\"");
+                            println!("[vm<-host] proxy_get_property(...) -> (return_value_data, return_value_size) return: {:?}", Status::InternalFailure);
+                            return Status::InternalFailure as i32;
+                        }
+                    };
+
+                    let malloc = match caller.get_export("malloc") {
+                        Some(Extern::Func(func)) => func,
+                        _ => {
+                            println!("Error: proxy_get_property cannot get export \"malloc\"");
+                            println!("[vm<-host] proxy_get_property(...) -> (return_value_data, return_value_size) return: {:?}", Status::InternalFailure);
+                            return Status::InternalFailure as i32;
+                        }
+                    };
+
+                    let path_raw = read_bytes(&caller, mem, path_data, path_size).unwrap();
+
+                    // Would be nice to deserialize path_raw to Vec<&str>
+                    println!("[vm->host] proxy_get_property({path_raw:?})");
+
+                    let property_value = match EXPECT
+                        .lock()
+                        .unwrap()
+                        .staged
+                        .get_expect_get_property(path_raw)
+                    {
+                        Some(expect_property_value) => expect_property_value,
+                        None => vec![],
+                    };
+
+                    unsafe {
+                        // allocate memory and store property value buffer
+                        let mut result = [Val::I32(0)];
+                        malloc
+                            .call(
+                                &mut caller,
+                                &[Val::I32(property_value.len() as i32)],
+                                &mut result,
+                            )
+                            .unwrap();
+                        let property_value_add = result[0].i32().unwrap() as u32 as usize;
+
+                        let property_value_ptr = mem.data_mut(&mut caller).get_unchecked_mut(
+                            property_value_add..property_value_add + property_value.len(),
+                        );
+                        property_value_ptr.copy_from_slice(&property_value);
+
+                        let return_value_size_ptr = mem.data_mut(&mut caller).get_unchecked_mut(
+                            return_value_size as u32 as usize
+                                ..return_value_size as u32 as usize + 4,
+                        );
+                        return_value_size_ptr
+                            .copy_from_slice(&(property_value.len() as u32).to_le_bytes());
+                        let return_value_data_ptr = mem.data_mut(&mut caller).get_unchecked_mut(
+                            return_value_data as u32 as usize
+                                ..return_value_data as u32 as usize + 4,
+                        );
+                        return_value_data_ptr
+                            .copy_from_slice(&(property_value_add as u32).to_le_bytes());
+                    }
+
                     println!(
                         "[vm->host] proxy_get_property(path_data, path_size) -> (...) status: {:?}",
                         get_status()
                     );
-                    println!("[vm<-host] proxy_get_property(...) -> (return_value_data, return_value_size) return: {:?}", Status::InternalFailure);
-                    return Status::InternalFailure as i32;
+                    println!("[vm<-host] proxy_get_property(...) -> (return_value_data, return_value_size) return: {:?}", Status::Ok);
+                    assert_ne!(get_status(), ExpectStatus::Failed);
+                    return Status::Ok as i32;
                 },
             ))
         }
@@ -1398,7 +1463,7 @@ fn get_hostfunc(
                  timeout_milliseconds: i32,
                  token_ptr: i32|
                  -> i32 {
-                    print!("[vm->host] proxy_grpc_call({initial_metadata_ptr}, {initial_metadata_size})");
+                    println!("[vm->host] proxy_grpc_call({initial_metadata_ptr}, {initial_metadata_size})");
 
                     // Default Function: receives and displays http call from proxy-wasm module
                     // Expectation: asserts equal the receieved http call with the expected one
@@ -1705,7 +1770,7 @@ pub mod serial_utils {
                             abcdefghijklmnopqrstuvwxyz\
                             0123456789)(*&^%$#@!~";
 
-    pub fn _serialize_property_path(path: Vec<&str>) -> Bytes {
+    pub fn serialize_property_path(path: Vec<&str>) -> Bytes {
         if path.is_empty() {
             return Vec::new();
         }
