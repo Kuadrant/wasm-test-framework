@@ -287,8 +287,6 @@ fn get_hostfunc(
                  return_value_data: i32,
                  return_value_size: i32|
                  -> i32 {
-                    println!("[vm->host] proxy_get_property({path_data}, {path_size})");
-
                     let mem = match caller.get_export("memory") {
                         Some(Extern::Memory(mem)) => mem,
                         _ => {
