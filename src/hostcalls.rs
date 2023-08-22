@@ -321,7 +321,7 @@ fn get_hostfunc(
                         Some(expect_property_value) => expect_property_value,
                         None => {
                             println!(
-                                "[vm->host] proxy_get_property(path_data, path_size) -> NotFound, status: {:?}",
+                                "[vm->host] proxy_get_property(...) -> NotFound, status: {:?}",
                                 get_status()
                             );
                             assert_ne!(get_status(), ExpectStatus::Failed);
@@ -360,11 +360,8 @@ fn get_hostfunc(
                             .copy_from_slice(&(property_value_add as u32).to_le_bytes());
                     }
 
-                    println!(
-                        "[vm->host] proxy_get_property(path_data, path_size) -> (...) status: {:?}",
-                        get_status()
-                    );
-                    println!("[vm<-host] proxy_get_property(...) -> (return_value_data, return_value_size) return: {:?}", Status::Ok);
+                    println!("[vm<-host] proxy_get_property(...) -> (return_value_data={property_value:?}, return_value_size={}) return: {:?}",
+                        property_value.len(), get_status());
                     assert_ne!(get_status(), ExpectStatus::Failed);
                     return Status::Ok as i32;
                 },
