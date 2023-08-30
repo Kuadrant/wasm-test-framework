@@ -287,8 +287,6 @@ fn get_hostfunc(
                  return_value_data: i32,
                  return_value_size: i32|
                  -> i32 {
-                    println!("[vm->host] proxy_get_property({path_data}, {path_size})");
-
                     let mem = match caller.get_export("memory") {
                         Some(Extern::Memory(mem)) => mem,
                         _ => {
@@ -319,7 +317,14 @@ fn get_hostfunc(
                         .get_expect_get_property(path_raw)
                     {
                         Some(expect_property_value) => expect_property_value,
-                        None => vec![],
+                        None => {
+                            println!(
+                                "[vm->host] proxy_get_property(...) -> NotFound, status: {:?}",
+                                get_status()
+                            );
+                            assert_ne!(get_status(), ExpectStatus::Failed);
+                            return Status::NotFound as i32;
+                        }
                     };
 
                     unsafe {
@@ -353,11 +358,8 @@ fn get_hostfunc(
                             .copy_from_slice(&(property_value_add as u32).to_le_bytes());
                     }
 
-                    println!(
-                        "[vm->host] proxy_get_property(path_data, path_size) -> (...) status: {:?}",
-                        get_status()
-                    );
-                    println!("[vm<-host] proxy_get_property(...) -> (return_value_data, return_value_size) return: {:?}", Status::Ok);
+                    println!("[vm<-host] proxy_get_property(...) -> (return_value_data={property_value:?}, return_value_size={}) return: {:?}",
+                        property_value.len(), get_status());
                     assert_ne!(get_status(), ExpectStatus::Failed);
                     return Status::Ok as i32;
                 },
@@ -832,7 +834,7 @@ fn get_hostfunc(
                             .staged
                             .get_expect_set_header_map_pairs(map_type, header_map_ptr);
                     }
-                    println!("[vm->host] proxy_set_header_map_pairs(map_type={}, map_data, map_size) status: {:?}", 
+                    println!("[vm->host] proxy_set_header_map_pairs(map_type={}, map_data, map_size) status: {:?}",
                         map_type, get_status()
                     );
                     println!(
@@ -938,10 +940,10 @@ fn get_hostfunc(
                         return_value_size_ptr
                             .copy_from_slice(&(string_value.len() as u32).to_le_bytes());
 
-                        println!("[vm->host] proxy_get_header_map_value(map_type={}, key_data={}, key_size={}) -> (...) status: {:?}", 
+                        println!("[vm->host] proxy_get_header_map_value(map_type={}, key_data={}, key_size={}) -> (...) status: {:?}",
                             map_type, string_key, key_size, get_status()
                         );
-                        println!("[vm<-host] proxy_get_header_map_value(...) -> (return_value_data={}, return_value_size={}) return: {:?}", 
+                        println!("[vm<-host] proxy_get_header_map_value(...) -> (return_value_data={}, return_value_size={}) return: {:?}",
                             string_value, string_value.len(), Status::Ok
                         );
                     }
