@@ -901,9 +901,22 @@ fn get_hostfunc(
                             {
                                 Some(expect_string_value) => expect_string_value,
                                 None => {
-                                    match HOST.lock().unwrap().staged.get_header_map_value(map_type, &string_key) {
+                                    match HOST
+                                        .lock()
+                                        .unwrap()
+                                        .staged
+                                        .get_header_map_value(map_type, &string_key)
+                                    {
                                         Some(host_string_value) => host_string_value,
-                                        None => panic!("Error: proxy_get_header_map_value | no header map value for key {}", string_key)}
+                                        None => {
+                                            println!(
+                                                "[vm->host] proxy_get_header_map_value(map_type={}, key_data={}) -> NotFound, status: {:?}",
+                                                map_type, string_key, get_status()
+                                            );
+                                            assert_ne!(get_status(), ExpectStatus::Failed);
+                                            return Status::NotFound as i32;
+                                        }
+                                    }
                                 }
                             };
                             (string_key.to_string(), string_value)
