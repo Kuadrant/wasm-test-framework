@@ -1485,9 +1485,9 @@ fn get_hostfunc(
                     let mem = match caller.get_export("memory") {
                         Some(Extern::Memory(mem)) => mem,
                         _ => {
-                            println!("Error: proxy_http_call cannot get export \"memory\"");
+                            println!("Error: proxy_grpc_call cannot get export \"memory\"");
                             println!(
-                                "[vm<-host] proxy_http_call(...) -> (return_token) return: {:?}",
+                                "[vm<-host] proxy_grpc_call(...) -> (return_token) return: {:?}",
                                 Status::InternalFailure
                             );
                             return Status::InternalFailure as i32;
@@ -1506,24 +1506,33 @@ fn get_hostfunc(
                     println!(
                         "[vm->host] proxy_grpc_call(service={service}, service_name={service_name}, method_name={method_name}, initial_metadata={initial_metadata:?}, request={request:?}, timeout={timeout_milliseconds}");
 
-                    let token_id = match EXPECT.lock().unwrap().staged.get_expect_grpc_call(
-                        service,
-                        service_name,
-                        method_name,
-                        initial_metadata,
-                        request,
-                        timeout_milliseconds,
-                    ) {
-                        Some(expect_token) => expect_token,
-                        None => 0,
-                    };
+                    let call_result = EXPECT
+                        .lock()
+                        .unwrap()
+                        .staged
+                        .get_expect_grpc_call(
+                            service,
+                            service_name,
+                            method_name,
+                            initial_metadata,
+                            request,
+                            timeout_milliseconds,
+                        )
+                        .unwrap_or(Ok(0));
 
-                    unsafe {
-                        let return_token_add = mem.data_mut(&mut caller).get_unchecked_mut(
-                            token_ptr as u32 as usize..token_ptr as u32 as usize + 4,
-                        );
-                        return_token_add.copy_from_slice(&token_id.to_le_bytes());
+                    if let Ok(token_id) = call_result {
+                        unsafe {
+                            let return_token_add = mem.data_mut(&mut caller).get_unchecked_mut(
+                                token_ptr as u32 as usize..token_ptr as u32 as usize + 4,
+                            );
+                            return_token_add.copy_from_slice(&token_id.to_le_bytes());
+                        }
                     }
+
+                    let call_status = match call_result {
+                        Ok(_) => Status::Ok,
+                        Err(s) => s,
+                    };
 
                     // Default Function:
                     // Expectation:
@@ -1536,7 +1545,7 @@ fn get_hostfunc(
                         Status::Ok
                     );
                     assert_ne!(get_status(), ExpectStatus::Failed);
-                    return Status::Ok as i32;
+                    return call_status as i32;
                 },
             ))
         }

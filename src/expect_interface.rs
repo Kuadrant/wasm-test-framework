@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use crate::tester::Tester;
+use crate::types::Status;
 
 // As of now, the following expectations do not require "fn returning()" implementations and hence
 // no structure is provided for them. Setting of these expectations are built directly into tester.rs:
@@ -182,7 +183,7 @@ impl<'a> ExpectGrpcCall<'a> {
         }
     }
 
-    pub fn returning(&mut self, token_id: Option<u32>) -> &mut Tester {
+    pub fn returning(&mut self, res: Result<u32, Status>) -> &mut Tester {
         self.tester.get_expect_handle().staged.set_expect_grpc_call(
             self.service,
             self.service_name,
@@ -190,7 +191,7 @@ impl<'a> ExpectGrpcCall<'a> {
             self.initial_metadata,
             self.request,
             self.timeout,
-            token_id,
+            res,
         );
         self.tester
     }
