@@ -59,6 +59,8 @@ pub enum Status {
     Ok = 0,
     NotFound = 1,
     BadArgument = 2,
+    SerializationFailure = 3,
+    ParseFailure = 4,
     Empty = 7,
     CasMismatch = 8,
     InternalFailure = 10,

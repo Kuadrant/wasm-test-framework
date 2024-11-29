@@ -96,7 +96,7 @@ pub struct Expect {
         Option<Bytes>,
         Option<Bytes>,
         Option<Duration>,
-        Option<u32>,
+        Result<u32, Status>,
     )>,
     get_property_value: Vec<(Option<Bytes>, Option<Bytes>)>,
 }
@@ -593,7 +593,7 @@ impl Expect {
         initial_metadata: Option<&[u8]>,
         request: Option<&[u8]>,
         timeout: Option<u64>,
-        token_id: Option<u32>,
+        res: Result<u32, Status>,
     ) {
         self.expect_count += 1;
         self.grpc_call.push((
@@ -603,7 +603,7 @@ impl Expect {
             initial_metadata.map(|s| s.to_vec()),
             request.map(|s| s.to_vec()),
             timeout.map(Duration::from_millis),
-            token_id,
+            res,
         ));
     }
 
@@ -615,7 +615,7 @@ impl Expect {
         initial_metadata: &[u8],
         request: &[u8],
         timeout: i32,
-    ) -> Option<u32> {
+    ) -> Option<Result<u32, Status>> {
         match self.grpc_call.len() {
             0 => {
                 if !self.allow_unexpected {
@@ -649,7 +649,7 @@ impl Expect {
                         .map(|e| e.as_millis() as i32 == timeout)
                         .unwrap_or(true);
                 set_expect_status(expected);
-                return result;
+                return Some(result);
             }
         }
     }
