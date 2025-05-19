@@ -292,6 +292,14 @@ impl Tester {
         ExpectGetProperty::expecting(self, path)
     }
 
+    pub fn expect_define_metric(
+        &mut self,
+        metric_type: Option<MetricType>,
+        name: Option<&'static str>,
+    ) -> ExpectDefineMetric {
+        ExpectDefineMetric::expecting(self, metric_type.map(|data| data as i32), name)
+    }
+
     /* ------------------------------------- High-level Expectation Setting ------------------------------------- */
 
     pub fn set_quiet(&mut self, quiet: bool) {
