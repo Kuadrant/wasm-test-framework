@@ -1650,8 +1650,6 @@ fn get_hostfunc(
              name_size: i32,
              return_metric_id: i32|
              -> i32 {
-                println!("[vm->host] proxy_define_metric({metric_type}, {name_data}, {name_size})");
-
                 let mem = match caller.get_export("memory") {
                     Some(Extern::Memory(mem)) => mem,
                     _ => {
@@ -1665,19 +1663,22 @@ fn get_hostfunc(
                 };
 
                 let name_raw = read_bytes(&caller, mem, name_data, name_size).unwrap();
-
-                println!("[vm->host] proxy_define_metric({metric_type}, {name_raw:?})");
+                let name_str =
+                    std::str::from_utf8(name_raw).unwrap_or("___ invalid utf-8 slice ____");
+                let name_cp = name_str.to_string();
 
                 let metric_id = match EXPECT
                     .lock()
                     .unwrap()
                     .staged
-                    .get_expect_define_metric(metric_type, name_raw)
+                    .get_expect_define_metric(metric_type, name_str)
                 {
                     Some(expect_metric_id) => expect_metric_id,
                     None => {
                         println!(
-                            "[vm->host] proxy_define_metric(...) -> NotFound, status: {:?}",
+                            "[vm->host] proxy_define_metric(metric_type: {}, name: {}) -> NotFound, status: {:?}",
+                            metric_type,
+                            name_cp,
                             get_status()
                         );
                         assert_ne!(get_status(), ExpectStatus::Failed);
@@ -1687,14 +1688,16 @@ fn get_hostfunc(
 
                 unsafe {
                     let data = mem.data_mut(&mut caller).get_unchecked_mut(
-                        return_metric_id as u32 as usize..return_metric_id as u32 as usize + 8,
+                        return_metric_id as u32 as usize..return_metric_id as u32 as usize + 4,
                     );
 
                     data.copy_from_slice(&metric_id.to_le_bytes());
                 }
 
                 println!(
-                    "[vm<-host] proxy_define_metric(...) -> (metric_id={return_metric_id}) return: {:?}",
+                    "[vm->host] proxy_define_metric(metric_type: {}, name: {}) -> (metric_id: {metric_id}) return: {:?}",
+                    metric_type,
+                    name_cp,
                     get_status()
                 );
                 assert_ne!(get_status(), ExpectStatus::Failed);
@@ -1702,21 +1705,24 @@ fn get_hostfunc(
             },
         )),
 
-        "proxy_increment_metric" => {
-            Some(Func::wrap(store, |_caller: Caller<'_, ()>| -> i32 {
-                // Default Function:
-                // Expectation:
+        "proxy_increment_metric" => Some(Func::wrap(
+            store,
+            |_caller: Caller<'_, ()>, metric_id: i32, offset: i64| -> i32 {
+                EXPECT
+                    .lock()
+                    .unwrap()
+                    .staged
+                    .get_expect_increment_metric(metric_id, offset);
                 println!(
-                    "[vm->host] proxy_increment_metric() -> (...) status: {:?}",
+                    "[vm->host] proxy_increment_metric(metric_id: {}, offset: {}) -> (..) return: {:?}",
+                    metric_id,
+                    offset,
                     get_status()
                 );
-                println!(
-                    "[vm<-host] proxy_increment_metric() -> (..) return: {:?}",
-                    Status::InternalFailure
-                );
-                return Status::InternalFailure as i32;
-            }))
-        }
+                assert_ne!(get_status(), ExpectStatus::Failed);
+                return Status::Ok as i32;
+            },
+        )),
 
         "proxy_record_metric" => {
             Some(Func::wrap(store, |_caller: Caller<'_, ()>| -> i32 {

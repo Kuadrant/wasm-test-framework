@@ -300,6 +300,17 @@ impl Tester {
         ExpectDefineMetric::expecting(self, metric_type.map(|data| data as i32), name)
     }
 
+    pub fn expect_increment_metric(
+        &mut self,
+        metric_id: Option<i32>,
+        offset: Option<i64>,
+    ) -> &mut Tester {
+        self.get_expect_handle()
+            .staged
+            .set_expect_increment_metric(metric_id, offset);
+        self
+    }
+
     /* ------------------------------------- High-level Expectation Setting ------------------------------------- */
 
     pub fn set_quiet(&mut self, quiet: bool) {

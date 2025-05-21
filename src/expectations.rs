@@ -100,6 +100,7 @@ pub struct Expect {
     )>,
     get_property_value: Vec<(Option<Bytes>, Option<Bytes>)>,
     define_metric_value: Vec<(Option<i32>, Option<String>, Option<i32>)>,
+    increment_metric_value: Vec<(Option<i32>, Option<i64>)>,
 }
 
 impl Expect {
@@ -123,6 +124,7 @@ impl Expect {
             grpc_call: vec![],
             get_property_value: vec![],
             define_metric_value: vec![],
+            increment_metric_value: vec![],
         }
     }
 
@@ -699,7 +701,7 @@ impl Expect {
             .push((metric_type, name.map(|data| data.to_string()), metric_id));
     }
 
-    pub fn get_expect_define_metric(&mut self, metric_type: i32, name_raw: &[u8]) -> Option<i32> {
+    pub fn get_expect_define_metric(&mut self, metric_type: i32, name: &str) -> Option<i32> {
         match self.define_metric_value.len() {
             0 => {
                 if !self.allow_unexpected {
@@ -713,23 +715,35 @@ impl Expect {
                 let defined_metric_tuple = self.define_metric_value.remove(0);
                 let mut expect_status =
                     metric_type == defined_metric_tuple.0.unwrap_or(metric_type);
-
-                match std::str::from_utf8(name_raw) {
-                    Ok(v) => {
-                        expect_status = expect_status
-                            && defined_metric_tuple
-                                .1
-                                .map(|expected_name| expected_name == v)
-                                .unwrap_or(true);
-                    }
-                    Err(_) => {
-                        set_status(ExpectStatus::Failed);
-                        return None;
-                    }
-                }
-
+                expect_status =
+                    expect_status && name == defined_metric_tuple.1.unwrap_or(name.to_string());
                 set_expect_status(expect_status);
                 defined_metric_tuple.2
+            }
+        }
+    }
+
+    pub fn set_expect_increment_metric(&mut self, metric_id: Option<i32>, offset: Option<i64>) {
+        self.expect_count += 1;
+        self.increment_metric_value.push((metric_id, offset));
+    }
+
+    pub fn get_expect_increment_metric(&mut self, metric_id: i32, offset: i64) {
+        match self.increment_metric_value.len() {
+            0 => {
+                if !self.allow_unexpected {
+                    self.expect_count -= 1;
+                }
+                set_status(ExpectStatus::Unexpected);
+            }
+            _ => {
+                self.expect_count -= 1;
+                let increment_metric_tuple = self.increment_metric_value.remove(0);
+                let mut expect_status = metric_id == increment_metric_tuple.0.unwrap_or(metric_id);
+                expect_status =
+                    expect_status && offset == increment_metric_tuple.1.unwrap_or(offset);
+
+                set_expect_status(expect_status);
             }
         }
     }
