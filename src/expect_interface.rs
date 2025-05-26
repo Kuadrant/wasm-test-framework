@@ -231,7 +231,7 @@ impl<'a> ExpectDefineMetric<'a> {
         metric_type: Option<i32>,
         name: Option<&'static str>,
     ) -> ExpectDefineMetric<'a> {
-        ExpectDefineMetric {
+        Self {
             tester,
             metric_type,
             name,

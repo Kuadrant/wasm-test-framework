@@ -712,13 +712,13 @@ impl Expect {
             }
             _ => {
                 self.expect_count -= 1;
-                let defined_metric_tuple = self.define_metric_value.remove(0);
-                let mut expect_status =
-                    metric_type == defined_metric_tuple.0.unwrap_or(metric_type);
-                expect_status =
-                    expect_status && name == defined_metric_tuple.1.unwrap_or(name.to_string());
-                set_expect_status(expect_status);
-                defined_metric_tuple.2
+                let (expected_metric_type, expected_name, metric_id) =
+                    self.define_metric_value.remove(0);
+                set_expect_status(
+                    metric_type == expected_metric_type.unwrap_or(metric_type)
+                        && name == expected_name.unwrap_or(name.to_string()),
+                );
+                metric_id
             }
         }
     }
@@ -738,12 +738,11 @@ impl Expect {
             }
             _ => {
                 self.expect_count -= 1;
-                let increment_metric_tuple = self.increment_metric_value.remove(0);
-                let mut expect_status = metric_id == increment_metric_tuple.0.unwrap_or(metric_id);
-                expect_status =
-                    expect_status && offset == increment_metric_tuple.1.unwrap_or(offset);
-
-                set_expect_status(expect_status);
+                let (expected_metric_id, expected_offset) = self.increment_metric_value.remove(0);
+                set_expect_status(
+                    metric_id == expected_metric_id.unwrap_or(metric_id)
+                        && offset == expected_offset.unwrap_or(offset),
+                );
             }
         }
     }

@@ -1688,7 +1688,8 @@ fn get_hostfunc(
 
                 unsafe {
                     let data = mem.data_mut(&mut caller).get_unchecked_mut(
-                        return_metric_id as u32 as usize..return_metric_id as u32 as usize + 4,
+                        return_metric_id as u32 as usize
+                            ..return_metric_id as u32 as usize + std::mem::size_of::<u32>(),
                     );
 
                     data.copy_from_slice(&metric_id.to_le_bytes());
