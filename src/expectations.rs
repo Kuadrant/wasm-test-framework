@@ -99,6 +99,8 @@ pub struct Expect {
         Result<u32, Status>,
     )>,
     get_property_value: Vec<(Option<Bytes>, Option<Bytes>)>,
+    define_metric_value: Vec<(Option<i32>, Option<String>, Option<i32>)>,
+    increment_metric_value: Vec<(Option<i32>, Option<i64>)>,
 }
 
 impl Expect {
@@ -121,6 +123,8 @@ impl Expect {
             http_call: vec![],
             grpc_call: vec![],
             get_property_value: vec![],
+            define_metric_value: vec![],
+            increment_metric_value: vec![],
         }
     }
 
@@ -682,6 +686,63 @@ impl Expect {
                 let expected = expected_path.map(|p| p == path).unwrap_or(true);
                 set_expect_status(expected);
                 result
+            }
+        }
+    }
+
+    pub fn set_expect_define_metric(
+        &mut self,
+        metric_type: Option<i32>,
+        name: Option<&str>,
+        metric_id: Option<i32>,
+    ) {
+        self.expect_count += 1;
+        self.define_metric_value
+            .push((metric_type, name.map(|data| data.to_string()), metric_id));
+    }
+
+    pub fn get_expect_define_metric(&mut self, metric_type: i32, name: &str) -> Option<i32> {
+        match self.define_metric_value.len() {
+            0 => {
+                if !self.allow_unexpected {
+                    self.expect_count -= 1;
+                }
+                set_status(ExpectStatus::Unexpected);
+                None
+            }
+            _ => {
+                self.expect_count -= 1;
+                let (expected_metric_type, expected_name, metric_id) =
+                    self.define_metric_value.remove(0);
+                set_expect_status(
+                    metric_type == expected_metric_type.unwrap_or(metric_type)
+                        && name == expected_name.unwrap_or(name.to_string()),
+                );
+                metric_id
+            }
+        }
+    }
+
+    pub fn set_expect_increment_metric(&mut self, metric_id: Option<i32>, offset: Option<i64>) {
+        self.expect_count += 1;
+        self.increment_metric_value.push((metric_id, offset));
+    }
+
+    pub fn get_expect_increment_metric(&mut self, metric_id: i32, offset: i64) {
+        match self.increment_metric_value.len() {
+            0 => {
+                if !self.allow_unexpected {
+                    self.expect_count -= 1;
+                }
+                set_status(ExpectStatus::Unexpected);
+            }
+            _ => {
+                self.expect_count -= 1;
+                let (expected_metric_id, expected_offset) = self.increment_metric_value.remove(0);
+                set_expect_status(
+                    metric_id == expected_metric_id.unwrap_or(metric_id)
+                        && offset == expected_offset.unwrap_or(offset),
+                );
             }
         }
     }
