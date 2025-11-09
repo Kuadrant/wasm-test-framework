@@ -745,14 +745,15 @@ fn get_hostfunc(
                         }
                     };
 
-                    let serial_map = match EXPECT
+                    let (status, serial_map) = match EXPECT
                         .lock()
                         .unwrap()
                         .staged
                         .get_expect_get_header_map_pairs(map_type)
                     {
-                        Some(header_map_pairs) => header_map_pairs,
-                        None => HOST.lock().unwrap().staged.get_header_map_pairs(map_type),
+                        (status, Some(header_map_pairs)) => (status, header_map_pairs),
+                        (Status::Ok, None) => (Status::Ok, HOST.lock().unwrap().staged.get_header_map_pairs(map_type)),
+                        (status, None) => (status, Bytes::new()),
                     };
                     let serial_map_size = serial_map.len();
 
@@ -788,7 +789,7 @@ fn get_hostfunc(
                         map_type,
                         get_status()
                     );
-                    println!("[vm<-host] proxy_get_header_map_pairs(...) -> (return_map_data, return_map_size) return: {:?}", Status::Ok);
+                    println!("[vm<-host] proxy_get_header_map_pairs(...) -> (return_map_data, return_map_size) return: {:?}", status);
                     assert_ne!(get_status(), ExpectStatus::Failed);
                     set_status(ExpectStatus::Unexpected);
                     return Status::Ok as i32;
