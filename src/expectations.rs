@@ -74,7 +74,7 @@ pub struct Expect {
     current_time_nanos: Vec<Option<SystemTime>>,
     get_buffer_bytes: Vec<(Option<i32>, Option<Bytes>)>,
     set_buffer_bytes: Vec<(Option<i32>, Option<Bytes>)>,
-    get_header_map_pairs: Vec<(Option<i32>, Option<Bytes>)>,
+    get_header_map_pairs: Vec<(Option<i32>, (Status, Option<Bytes>))>,
     set_header_map_pairs: Vec<(Option<i32>, Option<Bytes>)>,
     get_header_map_value: Vec<(Option<i32>, Option<String>, Option<String>)>,
     replace_header_map_value: Vec<(Option<i32>, Option<String>, Option<String>)>,
@@ -269,21 +269,22 @@ impl Expect {
     pub fn set_expect_get_header_map_pairs(
         &mut self,
         map_type: Option<i32>,
+        status: Status,
         header_map_pairs: Option<Vec<(&str, &str)>>,
     ) {
         self.expect_count += 1;
         self.get_header_map_pairs
-            .push((map_type, header_map_pairs.map(|map| serialize_map(map))));
+            .push((map_type, (status, header_map_pairs.map(|map| serialize_map(map)))));
     }
 
-    pub fn get_expect_get_header_map_pairs(&mut self, map_type: i32) -> Option<Bytes> {
+    pub fn get_expect_get_header_map_pairs(&mut self, map_type: i32) -> (Status, Option<Bytes>) {
         match self.get_header_map_pairs.len() {
             0 => {
                 if !self.allow_unexpected {
                     self.expect_count -= 1;
                 }
                 set_status(ExpectStatus::Unexpected);
-                None
+                (Status::Ok, None)
             }
             _ => {
                 self.expect_count -= 1;

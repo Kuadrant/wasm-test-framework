@@ -78,7 +78,15 @@ impl<'a> ExpectGetHeaderMapPairs<'a> {
         self.tester
             .get_expect_handle()
             .staged
-            .set_expect_get_header_map_pairs(self.map_type, header_map_pairs);
+            .set_expect_get_header_map_pairs(self.map_type, Status::Ok, header_map_pairs);
+        self.tester
+    }
+
+    pub fn failing_with(&mut self, fail: Status) -> &mut Tester {
+        self.tester
+            .get_expect_handle()
+            .staged
+            .set_expect_get_header_map_pairs(self.map_type, fail, None);
         self.tester
     }
 }
