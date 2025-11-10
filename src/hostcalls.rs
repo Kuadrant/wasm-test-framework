@@ -1209,11 +1209,11 @@ fn get_hostfunc(
                         .staged
                         .get_expect_get_buffer_bytes(buffer_type)
                     {
-                        Some(expect_buffer_bytes) => {
+                        (Status::Ok, Some(expect_buffer_bytes)) => {
                             assert_le!(expect_buffer_bytes.len(), (max_size - start) as usize);
                             expect_buffer_bytes
                         }
-                        None => {
+                        (Status::Ok, None) => {
                             let buffer_bytes: Bytes;
                             let host_buffer_bytes =
                                 HOST.lock().unwrap().staged.get_buffer_bytes(buffer_type);
@@ -1227,6 +1227,9 @@ fn get_hostfunc(
                                 .to_vec();
                             }
                             buffer_bytes
+                        }
+                        (status, _) => {
+                            return status as i32;
                         }
                     };
 
