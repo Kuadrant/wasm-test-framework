@@ -1183,26 +1183,6 @@ fn get_hostfunc(
                  return_buffer_data: i32,
                  return_buffer_size: i32|
                  -> i32 {
-                    // Default Function: generate and return random buffer_bytes of length max_size - start
-                    // Expectation: return buffer bytes set in expectation
-                    let mem = match caller.get_export("memory") {
-                        Some(Extern::Memory(mem)) => mem,
-                        _ => {
-                            println!("Error: proxy_get_buffer_bytes cannot get export \"memory\"");
-                            println!("[vm<-host] proxy_get_buffer_bytes(...) -> (return_buffer_data, return_buffer_size) return: {:?}", Status::InternalFailure);
-                            return Status::InternalFailure as i32;
-                        }
-                    };
-
-                    let malloc = match caller.get_export("malloc") {
-                        Some(Extern::Func(func)) => func,
-                        _ => {
-                            println!("Error: proxy_get_buffer_bytes cannot get export \"malloc\"");
-                            println!("[vm<-host] proxy_get_buffer_bytes(...) -> (return_buffer_data, return_buffer_size) return: {:?}", Status::InternalFailure);
-                            return Status::InternalFailure as i32;
-                        }
-                    };
-
                     let response_body = match EXPECT
                         .lock()
                         .unwrap()
@@ -1229,7 +1209,32 @@ fn get_hostfunc(
                             buffer_bytes
                         }
                         (status, _) => {
-                            return status as i32;
+                            let status = status as i32;
+                            println!(
+                                "[vm->host] proxy_get_buffer_bytes(buffer_type={}, start={}, max_size={}) -> Err({}) status: {:?}",
+                                buffer_type, start, max_size, status, get_status()
+                            );
+                            return status;
+                        }
+                    };
+
+                    // Default Function: generate and return random buffer_bytes of length max_size - start
+                    // Expectation: return buffer bytes set in expectation
+                    let mem = match caller.get_export("memory") {
+                        Some(Extern::Memory(mem)) => mem,
+                        _ => {
+                            println!("Error: proxy_get_buffer_bytes cannot get export \"memory\"");
+                            println!("[vm<-host] proxy_get_buffer_bytes(...) -> (return_buffer_data, return_buffer_size) return: {:?}", Status::InternalFailure);
+                            return Status::InternalFailure as i32;
+                        }
+                    };
+
+                    let malloc = match caller.get_export("malloc") {
+                        Some(Extern::Func(func)) => func,
+                        _ => {
+                            println!("Error: proxy_get_buffer_bytes cannot get export \"malloc\"");
+                            println!("[vm<-host] proxy_get_buffer_bytes(...) -> (return_buffer_data, return_buffer_size) return: {:?}", Status::InternalFailure);
+                            return Status::InternalFailure as i32;
                         }
                     };
 
