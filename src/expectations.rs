@@ -72,7 +72,7 @@ pub struct Expect {
     log_message: Vec<(Option<i32>, Option<String>)>,
     tick_period_millis: Vec<Option<Duration>>,
     current_time_nanos: Vec<Option<SystemTime>>,
-    get_buffer_bytes: Vec<(Option<i32>, Option<Bytes>)>,
+    get_buffer_bytes: Vec<(Option<i32>, (Status, Option<Bytes>))>,
     set_buffer_bytes: Vec<(Option<i32>, Option<Bytes>)>,
     get_header_map_pairs: Vec<(Option<i32>, (Status, Option<Bytes>))>,
     set_header_map_pairs: Vec<(Option<i32>, Option<Bytes>)>,
@@ -209,21 +209,22 @@ impl Expect {
     pub fn set_expect_get_buffer_bytes(
         &mut self,
         buffer_type: Option<i32>,
+        status: Status,
         buffer_data: Option<&[u8]>,
     ) {
         self.expect_count += 1;
         self.get_buffer_bytes
-            .push((buffer_type, buffer_data.map(|data| data.to_vec())));
+            .push((buffer_type, (status, buffer_data.map(|data| data.to_vec()))));
     }
 
-    pub fn get_expect_get_buffer_bytes(&mut self, buffer_type: i32) -> Option<Bytes> {
+    pub fn get_expect_get_buffer_bytes(&mut self, buffer_type: i32) -> (Status, Option<Bytes>) {
         match self.get_buffer_bytes.len() {
             0 => {
                 if !self.allow_unexpected {
                     self.expect_count -= 1;
                 }
                 set_status(ExpectStatus::Unexpected);
-                None
+                (Status::Ok, None)
             }
             _ => {
                 self.expect_count -= 1;

@@ -56,7 +56,15 @@ impl<'a> ExpectGetBufferBytes<'a> {
         self.tester
             .get_expect_handle()
             .staged
-            .set_expect_get_buffer_bytes(self.buffer_type, buffer_data);
+            .set_expect_get_buffer_bytes(self.buffer_type, Status::Ok, buffer_data);
+        self.tester
+    }
+    
+    pub fn failing_with(&mut self, fail: Status) -> &mut Tester {
+        self.tester
+            .get_expect_handle()
+            .staged
+            .set_expect_get_buffer_bytes(self.buffer_type, fail, None);
         self.tester
     }
 }
