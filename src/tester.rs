@@ -292,6 +292,17 @@ impl Tester {
         ExpectGetProperty::expecting(self, path)
     }
 
+    pub fn expect_set_property(
+        &mut self,
+        path: Option<Vec<&'static str>>,
+        value: Option<&'static [u8]>,
+    ) -> &mut Self {
+        self.get_expect_handle()
+            .staged
+            .set_expect_set_property(path, value);
+        self
+    }
+
     pub fn expect_define_metric(
         &mut self,
         metric_type: Option<MetricType>,

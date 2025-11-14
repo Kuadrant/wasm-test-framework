@@ -99,6 +99,7 @@ pub struct Expect {
         Result<u32, Status>,
     )>,
     get_property_value: Vec<(Option<Bytes>, Option<Bytes>)>,
+    set_property_value: Vec<(Option<Bytes>, Option<Bytes>)>,
     define_metric_value: Vec<(Option<i32>, Option<String>, Option<i32>)>,
     increment_metric_value: Vec<(Option<i32>, Option<i64>)>,
 }
@@ -123,6 +124,7 @@ impl Expect {
             http_call: vec![],
             grpc_call: vec![],
             get_property_value: vec![],
+            set_property_value: vec![],
             define_metric_value: vec![],
             increment_metric_value: vec![],
         }
@@ -274,8 +276,10 @@ impl Expect {
         header_map_pairs: Option<Vec<(&str, &str)>>,
     ) {
         self.expect_count += 1;
-        self.get_header_map_pairs
-            .push((map_type, (status, header_map_pairs.map(|map| serialize_map(map)))));
+        self.get_header_map_pairs.push((
+            map_type,
+            (status, header_map_pairs.map(|map| serialize_map(map))),
+        ));
     }
 
     pub fn get_expect_get_header_map_pairs(&mut self, map_type: i32) -> (Status, Option<Bytes>) {
@@ -688,6 +692,37 @@ impl Expect {
                 let expected = expected_path.map(|p| p == path).unwrap_or(true);
                 set_expect_status(expected);
                 result
+            }
+        }
+    }
+
+    pub fn set_expect_set_property(
+        &mut self,
+        path: Option<Vec<&str>>,
+        property_data: Option<&[u8]>,
+    ) {
+        self.expect_count += 1;
+        self.set_property_value.push((
+            path.map(|segments: Vec<&str>| serialize_property_path(segments)),
+            property_data.map(|data| data.to_vec()),
+        ));
+    }
+
+    pub fn get_expect_set_property(&mut self, path: &[u8], value: &[u8]) {
+        match self.set_property_value.len() {
+            0 => {
+                if !self.allow_unexpected {
+                    self.expect_count -= 1;
+                }
+                set_status(ExpectStatus::Unexpected);
+            }
+            _ => {
+                self.expect_count -= 1;
+                let (expected_path, expected_value) = self.set_property_value.remove(0);
+                // when expected anything is None, behave as catch all
+                let mut expected = expected_path.map(|p| p == path).unwrap_or(true);
+                expected = expected && expected_value.map(|v| v == value).unwrap_or(true);
+                set_expect_status(expected);
             }
         }
     }
