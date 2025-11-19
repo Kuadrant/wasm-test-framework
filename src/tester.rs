@@ -153,14 +153,14 @@ impl Tester {
         self
     }
 
-    pub fn expect_get_current_time_nanos(&mut self) -> ExpectGetCurrentTimeNanos {
+    pub fn expect_get_current_time_nanos(&mut self) -> ExpectGetCurrentTimeNanos<'_> {
         ExpectGetCurrentTimeNanos::expecting(self)
     }
 
     pub fn expect_get_buffer_bytes(
         &mut self,
         buffer_type: Option<BufferType>,
-    ) -> ExpectGetBufferBytes {
+    ) -> ExpectGetBufferBytes<'_> {
         ExpectGetBufferBytes::expecting(self, buffer_type.map(|data| data as i32))
     }
 
@@ -178,7 +178,7 @@ impl Tester {
     pub fn expect_get_header_map_pairs(
         &mut self,
         map_type: Option<MapType>,
-    ) -> ExpectGetHeaderMapPairs {
+    ) -> ExpectGetHeaderMapPairs<'_> {
         ExpectGetHeaderMapPairs::expecting(self, map_type.map(|data| data as i32))
     }
 
@@ -197,7 +197,7 @@ impl Tester {
         &mut self,
         map_type: Option<MapType>,
         header_map_key: Option<&'static str>,
-    ) -> ExpectGetHeaderMapValue {
+    ) -> ExpectGetHeaderMapValue<'_> {
         ExpectGetHeaderMapValue::expecting(self, map_type.map(|data| data as i32), header_map_key)
     }
 
@@ -264,7 +264,7 @@ impl Tester {
         body: Option<&'static str>,
         trailers: Option<Vec<(&'static str, &'static str)>>,
         timeout: Option<u64>,
-    ) -> ExpectHttpCall {
+    ) -> ExpectHttpCall<'_> {
         ExpectHttpCall::expecting(self, upstream, headers, body, trailers, timeout)
     }
 
@@ -276,7 +276,7 @@ impl Tester {
         initial_metadata: Option<&'static [u8]>,
         request: Option<&'static [u8]>,
         timeout: Option<u64>,
-    ) -> ExpectGrpcCall {
+    ) -> ExpectGrpcCall<'_> {
         ExpectGrpcCall::expecting(
             self,
             service,
@@ -288,7 +288,10 @@ impl Tester {
         )
     }
 
-    pub fn expect_get_property(&mut self, path: Option<Vec<&'static str>>) -> ExpectGetProperty {
+    pub fn expect_get_property(
+        &mut self,
+        path: Option<Vec<&'static str>>,
+    ) -> ExpectGetProperty<'_> {
         ExpectGetProperty::expecting(self, path)
     }
 
@@ -296,7 +299,7 @@ impl Tester {
         &mut self,
         metric_type: Option<MetricType>,
         name: Option<&'static str>,
-    ) -> ExpectDefineMetric {
+    ) -> ExpectDefineMetric<'_> {
         ExpectDefineMetric::expecting(self, metric_type.map(|data| data as i32), name)
     }
 
@@ -335,7 +338,7 @@ impl Tester {
         self
     }
 
-    pub fn set_default_buffer_bytes(&mut self, buffer_type: BufferType) -> DefaultBufferBytes {
+    pub fn set_default_buffer_bytes(&mut self, buffer_type: BufferType) -> DefaultBufferBytes<'_> {
         DefaultBufferBytes::expecting(self, buffer_type as i32)
     }
 
@@ -344,13 +347,13 @@ impl Tester {
         self
     }
 
-    pub fn set_default_header_map_pairs(&mut self, map_type: MapType) -> DefaultHeaderMapPairs {
+    pub fn set_default_header_map_pairs(&mut self, map_type: MapType) -> DefaultHeaderMapPairs<'_> {
         DefaultHeaderMapPairs::expecting(self, map_type as i32)
     }
 
     /* ------------------------------------- Utility Functions ------------------------------------- */
 
-    pub fn get_expect_handle(&self) -> MutexGuard<ExpectHandle> {
+    pub fn get_expect_handle(&self) -> MutexGuard<'_, ExpectHandle> {
         self.expect.lock().unwrap()
     }
 
@@ -372,7 +375,7 @@ impl Tester {
         }
     }
 
-    pub fn get_settings_handle(&self) -> MutexGuard<HostHandle> {
+    pub fn get_settings_handle(&self) -> MutexGuard<'_, HostHandle> {
         self.defaults.lock().unwrap()
     }
 
