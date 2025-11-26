@@ -369,20 +369,46 @@ fn get_hostfunc(
         "proxy_set_property" => {
             Some(Func::wrap(
                 store,
-                |_caller: Caller<'_, ()>,
-                 _path_data: i32,
-                 _path_size: i32,
-                 _value_data: i32,
-                 _value_size: i32|
+                |mut caller: Caller<'_, ()>,
+                 path_data: i32,
+                 path_size: i32,
+                 value_data: i32,
+                 value_size: i32|
                  -> i32 {
-                    // Default Function:
-                    // Expectation:
-                    println!("[vm->host] proxy_set_property(path_data, path_size, value_data, value_size) status: {:?}", get_status());
+                    // Default Function: receives and displays property set call
+                    // Expectation: asserts the received path and value match the expected ones
+                    let mem = match caller.get_export("memory") {
+                        Some(Extern::Memory(mem)) => mem,
+                        _ => {
+                            println!("Error: proxy_set_property cannot get export \"memory\"");
+                            println!(
+                                "[vm<-host] proxy_set_property(...) return: {:?}",
+                                Status::InternalFailure
+                            );
+                            return Status::InternalFailure as i32;
+                        }
+                    };
+
+                    let path_raw = read_bytes(&caller, mem, path_data, path_size).unwrap();
+                    let value_raw = read_bytes(&caller, mem, value_data, value_size).unwrap();
+
+                    EXPECT
+                        .lock()
+                        .unwrap()
+                        .staged
+                        .get_expect_set_property(path_raw, value_raw);
+
+                    println!(
+                        "[vm->host] proxy_set_property(path={path_raw:?}, path_size={}, value={value_raw:?}, value_size={}) status: {:?}",
+                        path_raw.len(), value_raw.len(), get_status()
+                    );
                     println!(
                         "[vm<-host] proxy_set_property(...) return: {:?}",
-                        Status::InternalFailure
+                        Status::Ok
                     );
-                    return Status::InternalFailure as i32;
+                    assert_ne!(get_status(), ExpectStatus::Failed);
+                    set_status(ExpectStatus::Unexpected);
+                    return Status::Ok as i32;
                 },
             ))
         }
@@ -752,7 +778,10 @@ fn get_hostfunc(
                         .get_expect_get_header_map_pairs(map_type)
                     {
                         (status, Some(header_map_pairs)) => (status, header_map_pairs),
-                        (Status::Ok, None) => (Status::Ok, HOST.lock().unwrap().staged.get_header_map_pairs(map_type)),
+                        (Status::Ok, None) => (
+                            Status::Ok,
+                            HOST.lock().unwrap().staged.get_header_map_pairs(map_type),
+                        ),
                         (status, None) => (status, Bytes::new()),
                     };
                     let serial_map_size = serial_map.len();
