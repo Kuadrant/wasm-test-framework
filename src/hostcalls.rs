@@ -296,13 +296,17 @@ fn get_hostfunc(
                         }
                     };
 
-                    let malloc = match caller.get_export("malloc") {
+                    // Try proxy_on_memory_allocate first (proxy-wasm ABI), then fall back to malloc
+                    let malloc = match caller.get_export("proxy_on_memory_allocate") {
                         Some(Extern::Func(func)) => func,
-                        _ => {
-                            println!("Error: proxy_get_property cannot get export \"malloc\"");
-                            println!("[vm<-host] proxy_get_property(...) -> (return_value_data, return_value_size) return: {:?}", Status::InternalFailure);
-                            return Status::InternalFailure as i32;
-                        }
+                        _ => match caller.get_export("malloc") {
+                            Some(Extern::Func(func)) => func,
+                            _ => {
+                                println!("Error: proxy_get_property cannot get export \"proxy_on_memory_allocate\" or \"malloc\"");
+                                println!("[vm<-host] proxy_get_property(...) -> (return_value_data, return_value_size) return: {:?}", Status::InternalFailure);
+                                return Status::InternalFailure as i32;
+                            }
+                        },
                     };
 
                     let path_raw = read_bytes(&caller, mem, path_data, path_size).unwrap();
@@ -760,15 +764,19 @@ fn get_hostfunc(
                         }
                     };
 
-                    let malloc = match caller.get_export("malloc") {
+                    // Try proxy_on_memory_allocate first (proxy-wasm ABI), then fall back to malloc
+                    let malloc = match caller.get_export("proxy_on_memory_allocate") {
                         Some(Extern::Func(func)) => func,
-                        _ => {
-                            println!(
-                                "Error: proxy_get_header_map_pairs cannot get export \"malloc\""
-                            );
-                            println!("[vm<-host] proxy_get_header_map_pairs(...) -> (return_map_data, return_map_size) return: {:?}", Status::InternalFailure);
-                            return Status::InternalFailure as i32;
-                        }
+                        _ => match caller.get_export("malloc") {
+                            Some(Extern::Func(func)) => func,
+                            _ => {
+                                println!(
+                                    "Error: proxy_get_header_map_pairs cannot get export \"proxy_on_memory_allocate\" or \"malloc\""
+                                );
+                                println!("[vm<-host] proxy_get_header_map_pairs(...) -> (return_map_data, return_map_size) return: {:?}", Status::InternalFailure);
+                                return Status::InternalFailure as i32;
+                            }
+                        },
                     };
 
                     let (status, serial_map) = match EXPECT
@@ -902,15 +910,19 @@ fn get_hostfunc(
                         }
                     };
 
-                    let malloc = match caller.get_export("malloc") {
+                    // Try proxy_on_memory_allocate first (proxy-wasm ABI), then fall back to malloc
+                    let malloc = match caller.get_export("proxy_on_memory_allocate") {
                         Some(Extern::Func(func)) => func,
-                        _ => {
-                            println!(
-                                "Error: proxy_get_header_map_value cannot get export \"malloc\""
-                            );
-                            println!("[vm<-host] proxy_get_header_map_value(...) -> (return_value_data, return_value_size) return: {:?}", Status::InternalFailure);
-                            return Status::InternalFailure as i32;
-                        }
+                        _ => match caller.get_export("malloc") {
+                            Some(Extern::Func(func)) => func,
+                            _ => {
+                                println!(
+                                    "Error: proxy_get_header_map_value cannot get export \"proxy_on_memory_allocate\" or \"malloc\""
+                                );
+                                println!("[vm<-host] proxy_get_header_map_value(...) -> (return_value_data, return_value_size) return: {:?}", Status::InternalFailure);
+                                return Status::InternalFailure as i32;
+                            }
+                        },
                     };
 
                     unsafe {
@@ -1258,13 +1270,17 @@ fn get_hostfunc(
                         }
                     };
 
-                    let malloc = match caller.get_export("malloc") {
+                    // Try proxy_on_memory_allocate first (proxy-wasm ABI), then fall back to malloc
+                    let malloc = match caller.get_export("proxy_on_memory_allocate") {
                         Some(Extern::Func(func)) => func,
-                        _ => {
-                            println!("Error: proxy_get_buffer_bytes cannot get export \"malloc\"");
-                            println!("[vm<-host] proxy_get_buffer_bytes(...) -> (return_buffer_data, return_buffer_size) return: {:?}", Status::InternalFailure);
-                            return Status::InternalFailure as i32;
-                        }
+                        _ => match caller.get_export("malloc") {
+                            Some(Extern::Func(func)) => func,
+                            _ => {
+                                println!("Error: proxy_get_buffer_bytes cannot get export \"proxy_on_memory_allocate\" or \"malloc\"");
+                                println!("[vm<-host] proxy_get_buffer_bytes(...) -> (return_buffer_data, return_buffer_size) return: {:?}", Status::InternalFailure);
+                                return Status::InternalFailure as i32;
+                            }
+                        },
                     };
 
                     unsafe {
@@ -1854,6 +1870,144 @@ fn get_hostfunc(
                     Status::InternalFailure
                 );
                 return Status::InternalFailure as i32;
+            },
+        )),
+
+        /* ---------------------------------- WASI Functions ---------------------------------- */
+        // Minimal WASI implementation for wasm32-wasip1 support
+        "random_get" => Some(Func::wrap(
+            store,
+            |mut caller: Caller<'_, ()>, buf: i32, buf_len: i32| -> i32 {
+                let mem = match caller.get_export("memory") {
+                    Some(Extern::Memory(mem)) => mem,
+                    _ => return 1,
+                };
+                unsafe {
+                    let buffer = mem
+                        .data_mut(&mut caller)
+                        .get_unchecked_mut(buf as usize..buf as usize + buf_len as usize);
+                    use rand::Rng;
+                    rand::thread_rng().fill(buffer);
+                }
+                0
+            },
+        )),
+
+        "fd_write" => {
+            Some(Func::wrap(
+                store,
+                |mut caller: Caller<'_, ()>,
+                 fd: i32,
+                 iovs: i32,
+                 iovs_len: i32,
+                 nwritten: i32|
+                 -> i32 {
+                    let mem = match caller.get_export("memory") {
+                        Some(Extern::Memory(mem)) => mem,
+                        _ => return 8, // EBADF
+                    };
+                    let mut total = 0u32;
+                    unsafe {
+                        for i in 0..iovs_len {
+                            let base_offset = (iovs + i * 8) as usize;
+                            let len_offset = (iovs + i * 8 + 4) as usize;
+                            let base_bytes = mem
+                                .data(&caller)
+                                .get_unchecked(base_offset..base_offset + 4);
+                            let len_bytes =
+                                mem.data(&caller).get_unchecked(len_offset..len_offset + 4);
+                            let base = u32::from_le_bytes([
+                                base_bytes[0],
+                                base_bytes[1],
+                                base_bytes[2],
+                                base_bytes[3],
+                            ]) as usize;
+                            let len = u32::from_le_bytes([
+                                len_bytes[0],
+                                len_bytes[1],
+                                len_bytes[2],
+                                len_bytes[3],
+                            ]) as usize;
+                            if len > 0 {
+                                let data = mem.data(&caller).get_unchecked(base..base + len);
+                                if fd == 1 || fd == 2 {
+                                    if let Ok(s) = std::str::from_utf8(data) {
+                                        print!("{}", s);
+                                    }
+                                }
+                                total += len as u32;
+                            }
+                        }
+                        let nwritten_bytes = mem
+                            .data_mut(&mut caller)
+                            .get_unchecked_mut(nwritten as usize..nwritten as usize + 4);
+                        nwritten_bytes.copy_from_slice(&total.to_le_bytes());
+                    }
+                    return Status::Ok as i32;
+                },
+            ))
+        }
+
+        "environ_sizes_get" => {
+            Some(Func::wrap(
+                store,
+                |mut caller: Caller<'_, ()>, environc: i32, environ_buf_size: i32| -> i32 {
+                    let mem = match caller.get_export("memory") {
+                        Some(Extern::Memory(mem)) => mem,
+                        _ => return 1,
+                    };
+                    unsafe {
+                        // Return 0 environment variables and 0 buffer size
+                        let environc_bytes = mem
+                            .data_mut(&mut caller)
+                            .get_unchecked_mut(environc as usize..environc as usize + 4);
+                        environc_bytes.copy_from_slice(&0u32.to_le_bytes());
+
+                        let buf_size_bytes = mem.data_mut(&mut caller).get_unchecked_mut(
+                            environ_buf_size as usize..environ_buf_size as usize + 4,
+                        );
+                        buf_size_bytes.copy_from_slice(&0u32.to_le_bytes());
+                    }
+                    0
+                },
+            ))
+        }
+
+        "environ_get" => Some(Func::wrap(
+            store,
+            |_caller: Caller<'_, ()>, _environ: i32, _environ_buf: i32| -> i32 { 0 },
+        )),
+
+        "proc_exit" => Some(Func::wrap(
+            store,
+            |_caller: Caller<'_, ()>, exit_code: i32| {
+                // Just return and let the test continue
+                println!("[wasm] proc_exit called with code: {}", exit_code);
+            },
+        )),
+
+        "sched_yield" => Some(Func::wrap(store, |_caller: Caller<'_, ()>| -> i32 { 0 })),
+
+        "clock_time_get" => Some(Func::wrap(
+            store,
+            |mut caller: Caller<'_, ()>, _clock_id: i32, _precision: i64, time_ptr: i32| -> i32 {
+                let mem = match caller.get_export("memory") {
+                    Some(Extern::Memory(mem)) => mem,
+                    _ => return 1,
+                };
+
+                let time_nanos = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_nanos() as u64;
+
+                unsafe {
+                    let time_bytes = mem
+                        .data_mut(&mut caller)
+                        .get_unchecked_mut(time_ptr as usize..time_ptr as usize + 8);
+                    time_bytes.copy_from_slice(&time_nanos.to_le_bytes());
+                }
+                0
             },
         )),
 
