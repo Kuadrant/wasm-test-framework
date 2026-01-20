@@ -72,6 +72,7 @@ pub struct Expect {
     log_message: Vec<(Option<i32>, Option<String>)>,
     tick_period_millis: Vec<Option<Duration>>,
     current_time_nanos: Vec<Option<SystemTime>>,
+    log_level: Vec<Option<i32>>,
     get_buffer_bytes: Vec<(Option<i32>, (Status, Option<Bytes>))>,
     set_buffer_bytes: Vec<(Option<i32>, Option<Bytes>)>,
     get_header_map_pairs: Vec<(Option<i32>, (Status, Option<Bytes>))>,
@@ -112,6 +113,7 @@ impl Expect {
             log_message: vec![],
             tick_period_millis: vec![],
             current_time_nanos: vec![],
+            log_level: vec![],
             get_buffer_bytes: vec![],
             set_buffer_bytes: vec![],
             get_header_map_pairs: vec![],
@@ -204,6 +206,28 @@ impl Expect {
                 self.current_time_nanos
                     .remove(0)
                     .map(|time_nanos| time_nanos.duration_since(UNIX_EPOCH).unwrap().as_nanos())
+            }
+        }
+    }
+
+    pub fn set_expect_get_log_level(&mut self, log_level: Option<i32>) {
+        self.expect_count += 1;
+        self.log_level.push(log_level);
+    }
+
+    pub fn get_expect_get_log_level(&mut self) -> Option<i32> {
+        match self.log_level.len() {
+            0 => {
+                if !self.allow_unexpected {
+                    self.expect_count -= 1;
+                }
+                set_status(ExpectStatus::Unexpected);
+                None
+            }
+            _ => {
+                self.expect_count -= 1;
+                set_status(ExpectStatus::Expected);
+                self.log_level.remove(0)
             }
         }
     }

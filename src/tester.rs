@@ -157,6 +157,10 @@ impl Tester {
         ExpectGetCurrentTimeNanos::expecting(self)
     }
 
+    pub fn expect_get_log_level(&mut self) -> ExpectGetLogLevel<'_> {
+        ExpectGetLogLevel::expecting(self)
+    }
+
     pub fn expect_get_buffer_bytes(
         &mut self,
         buffer_type: Option<BufferType>,
