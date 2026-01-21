@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use crate::tester::Tester;
+use crate::types::LogLevel;
 use crate::types::Status;
 
 // As of now, the following expectations do not require "fn returning()" implementations and hence
@@ -35,6 +36,24 @@ impl<'a> ExpectGetCurrentTimeNanos<'a> {
             .get_expect_handle()
             .staged
             .set_expect_get_current_time_nanos(current_time_nanos);
+        self.tester
+    }
+}
+
+pub struct ExpectGetLogLevel<'a> {
+    tester: &'a mut Tester,
+}
+
+impl<'a> ExpectGetLogLevel<'a> {
+    pub fn expecting(tester: &'a mut Tester) -> ExpectGetLogLevel<'a> {
+        ExpectGetLogLevel { tester: tester }
+    }
+
+    pub fn returning(&mut self, log_level: Option<LogLevel>) -> &mut Tester {
+        self.tester
+            .get_expect_handle()
+            .staged
+            .set_expect_get_log_level(log_level.map(|l| l as i32));
         self.tester
     }
 }

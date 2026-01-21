@@ -177,18 +177,42 @@ fn get_hostfunc(
         "proxy_get_log_level" => {
             Some(Func::wrap(
                 store,
-                |_caller: Caller<'_, ()>, _level: i32| -> i32 {
-                    // Default Function:
-                    // Expectation:
+                |mut caller: Caller<'_, ()>, return_level: i32| -> i32 {
+                    // Default Function: respond to proxy-wasm module with the current log level
+                    // Expectation: respond with a pre-set expected log level
+                    let mem = match caller.get_export("memory") {
+                        Some(Extern::Memory(mem)) => mem,
+                        _ => {
+                            println!("Error: proxy_get_log_level cannot get export \"memory\"");
+                            println!("[vm<-host] proxy_get_log_level(...) -> (return_level) return: {:?}", Status::InternalFailure);
+                            return Status::InternalFailure as i32;
+                        }
+                    };
+
+                    let log_level = match EXPECT.lock().unwrap().staged.get_expect_get_log_level() {
+                        Some(level) => level as u32,
+                        None => LogLevel::Info as u32,
+                    };
+
+                    unsafe {
+                        let data = mem.data_mut(&mut caller).get_unchecked_mut(
+                            return_level as u32 as usize..return_level as u32 as usize + 4,
+                        );
+
+                        data.copy_from_slice(&log_level.to_le_bytes());
+                    }
                     println!(
                         "[vm->host] proxy_get_log_level() -> (...) status: {:?}",
                         get_status()
                     );
                     println!(
-                        "[vm<-host] proxy_get_log_level() -> (..) return: {:?}",
-                        Status::InternalFailure
+                        "[vm<-host] proxy_get_log_level() -> (return_level={}) return: {:?}",
+                        log_level,
+                        Status::Ok
                     );
-                    return Status::InternalFailure as i32;
+                    assert_ne!(get_status(), ExpectStatus::Failed);
+                    set_status(ExpectStatus::Unexpected);
+                    return Status::Ok as i32;
                 },
             ))
         }
