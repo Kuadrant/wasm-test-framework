@@ -41,9 +41,9 @@ pub fn get_status() -> ExpectStatus {
 pub fn get_abi_version(module: &Module) -> AbiVersion {
     if module.get_export("proxy_abi_version_0_1_0").is_some() {
         AbiVersion::ProxyAbiVersion0_1_0
-    } else if module.get_export("proxy_abi_version_0_2_0").is_some() {
-        AbiVersion::ProxyAbiVersion0_2_0
-    } else if module.get_export("proxy_abi_version_0_2_1").is_some() {
+    } else if module.get_export("proxy_abi_version_0_2_0").is_some()
+        || module.get_export("proxy_abi_version_0_2_1").is_some()
+    {
         AbiVersion::ProxyAbiVersion0_2_0
     } else {
         panic!("Error: test-framework does not support proxy-wasm modules of this abi version");
@@ -445,7 +445,7 @@ fn get_hostfunc(
         "proxy_continue_stream" => {
             Some(Func::wrap(
                 store,
-                |_caller: Caller<'_, ()>, _something: i32| -> i32 {
+                |_caller: Caller<'_, ()>, stream_type: i32| -> i32 {
                     // Default Function:
                     // Expectation:
                     assert_eq!(
@@ -453,11 +453,11 @@ fn get_hostfunc(
                         AbiVersion::ProxyAbiVersion0_2_0
                     );
                     println!(
-                        "[vm->host] proxy_continue_stream() status: {:?}",
+                        "[vm->host] proxy_continue_stream(stream_type={stream_type}) status: {:?}",
                         get_status()
                     );
                     println!(
-                        "[vm<-host] proxy_continue_stream() return: {:?}",
+                        "[vm<-host] proxy_continue_stream(...) return: {:?}",
                         Status::Ok
                     );
                     assert_ne!(get_status(), ExpectStatus::Failed);
@@ -470,15 +470,21 @@ fn get_hostfunc(
         "proxy_close_stream" => {
             Some(Func::wrap(
                 store,
-                |_caller: Caller<'_, ()>, _something: i32| -> i32 {
+                |_caller: Caller<'_, ()>, stream_type: i32| -> i32 {
                     // Default Function:
                     // Expectation:
                     assert_eq!(
                         HOST.lock().unwrap().staged.get_abi_version(),
                         AbiVersion::ProxyAbiVersion0_2_0
                     );
-                    println!("[vm->host] proxy_close_stream() status: {:?}", get_status());
-                    println!("[vm<-host] proxy_close_stream() return: {:?}", Status::Ok);
+                    println!(
+                        "[vm->host] proxy_close_stream(stream_type={stream_type}) status: {:?}",
+                        get_status()
+                    );
+                    println!(
+                        "[vm<-host] proxy_close_stream(...) return: {:?}",
+                        Status::Ok
+                    );
                     assert_ne!(get_status(), ExpectStatus::Failed);
                     set_status(ExpectStatus::Unexpected);
                     return Status::Ok as i32;
@@ -2126,7 +2132,7 @@ pub mod serial_utils {
         let mut rng = rand::thread_rng();
         let random_string: String = (0..string_len)
             .map(|_| {
-                let idx = rng.gen_range(0, CHARSET.len());
+                let idx = rng.gen_range(0..CHARSET.len());
                 CHARSET[idx] as char
             })
             .collect();
